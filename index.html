@@ -5,22 +5,29 @@
     <title>Image Review Demo (CSV Download)</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
-      body { font-family: sans-serif; max-width: 600px; margin: 2rem auto; }
-      img { max-width: 100%; max-height: 300px; display: block; margin: 1rem 0; }
-      button { margin: 0.25rem; }
+      body { 
+        font-family: sans-serif;
+        color: white;
+        max-width: 700px;
+        margin: 2rem auto;
+        background-color: rgb(34, 34, 34);
+      }
+      img { max-width: 100%; max-height: 100%; display: block; margin: 1rem 0; }
+      button { margin: 0.25rem; font-size: 15px }
       .hidden { display: none; }
     </style>
   </head>
   <body>
-    <h1>Image Review Demo</h1>
+    <h1>SNM Image Review Beta</h1>
 
-    <p>Enter your name, then review each image as Accept or Deny.</p>
-
-    <label>
-      Your name:
-      <input type="text" id="username" />
-    </label>
-    <button id="startBtn">Start</button>
+    <div id="startBlock">
+      <p>Enter your name, then review each image as Accept or Deny.</p>
+      <label>
+        Your name:
+        <input type="text" id="username" />
+      </label>
+      <button id="startBtn">Start</button>
+    </div>
 
     <div id="app" class="hidden">
       <p id="imageCounter"></p>

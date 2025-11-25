@@ -41,6 +41,9 @@ startBtn.addEventListener("click", () => {
     alert("Please enter your name first.");
     return;
   }
+  // hide block
+  document.getElementById("startBlock").style.display = "none";
+
   currentIndex = 0;
   decisions = [];
   appDiv.classList.remove("hidden");
@@ -59,7 +62,7 @@ function recordDecision(decision) {
     decisions.push({ image: imagePath, decision });
   }
 
-  statusEl.textContent = `You chose: ${decision.toUpperCase()} for this image.`;
+  statusEl.textContent = `You chose: ${decision.toUpperCase()}`;
   nextBtn.disabled = false;
 }
 
