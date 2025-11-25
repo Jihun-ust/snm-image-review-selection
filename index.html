@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Image Review Demo (CSV Download)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body { font-family: sans-serif; max-width: 600px; margin: 2rem auto; }
+      img { max-width: 100%; max-height: 300px; display: block; margin: 1rem 0; }
+      button { margin: 0.25rem; }
+      .hidden { display: none; }
+    </style>
+  </head>
+  <body>
+    <h1>Image Review Demo</h1>
+
+    <p>Enter your name, then review each image as Accept or Deny.</p>
+
+    <label>
+      Your name:
+      <input type="text" id="username" />
+    </label>
+    <button id="startBtn">Start</button>
+
+    <div id="app" class="hidden">
+      <p id="imageCounter"></p>
+      <img id="image" src="" alt="Current image" />
+
+      <div>
+        <strong>Decision:</strong>
+        <button id="acceptBtn">Accept</button>
+        <button id="denyBtn">Deny</button>
+      </div>
+
+      <div>
+        <button id="nextBtn" disabled>Next image</button>
+        <button id="submitBtn" disabled>Download CSV</button>
+      </div>
+
+      <p id="status"></p>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
