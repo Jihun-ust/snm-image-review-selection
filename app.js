@@ -23,8 +23,8 @@ function updateUI() {
   if (currentIndex < IMAGES.length) {
     imageEl.src = IMAGES[currentIndex];
     imageCounterEl.textContent = `Image ${currentIndex + 1} of ${IMAGES.length}`;
-    nextBtn.disabled = true; // must choose accept/deny first
-    statusEl.textContent = "";
+    nextBtn.disabled = false;
+    statusEl.textContent = "Default: ACCEPT (click Deny to change)";
   } else {
     imageEl.src = "";
     imageCounterEl.textContent = "No more images.";
@@ -61,18 +61,24 @@ function recordDecision(decision) {
     decisions.push({ image: imagePath, decision });
   }
 
-  statusEl.textContent = `You chose: ${decision.toUpperCase()}`;
-  nextBtn.disabled = false;
+  statusEl.textContent = `You chose: ${decision.toUpperCase()} for this image.`;
 }
 
 acceptBtn.addEventListener("click", () => recordDecision("accept"));
 denyBtn.addEventListener("click", () => recordDecision("deny"));
 
 nextBtn.addEventListener("click", () => {
-  if (currentIndex < IMAGES.length) {
-    currentIndex += 1;
-    updateUI();
+  if (currentIndex >= IMAGES.length) return;
+
+  const imagePath = IMAGES[currentIndex];
+  let existing = decisions.find(d => d.image === imagePath);
+
+  if (!existing) {
+    decisions.push({ image: imagePath, decision: "accept" });
   }
+
+  currentIndex += 1;
+  updateUI();
 });
 
 // Utility: escape a cell for CSV
