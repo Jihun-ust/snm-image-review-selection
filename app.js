@@ -1,9 +1,8 @@
 // ====== CONFIG ======
-const IMAGES = [
-  "images/variation_01.png",
-  "images/variation_02.png",
-  "images/variation_03.png",
-];
+const IMAGES = Array.from({ length: 60 }, (_, i) => {
+  const num = (i + 1).toString().padStart(2, "0");
+  return `images/variation_${num}.png`;
+});
 // =====================
 
 const usernameInput = document.getElementById("username");
