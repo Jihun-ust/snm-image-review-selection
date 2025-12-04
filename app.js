@@ -66,7 +66,7 @@ function recordDecision(decision) {
 }
 
 acceptBtn.addEventListener("click", () => recordDecision("accept"));
-denyBtn.addEventListener("click", () => recordDecision("deny"));
+denyBtn.addEventListener("click", () => recordDecision("redo insertion"));
 
 nextBtn.addEventListener("click", () => {
   if (currentIndex < IMAGES.length) {
