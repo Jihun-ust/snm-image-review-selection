@@ -5,7 +5,7 @@ const IMAGES = Array.from({ length: 60 }, (_, i) => {
 });
 
 // Your backend endpoint that writes to MongoDB
-const SAVE_ENDPOINT = "https://snm-image-review-backend-n86f-hzi3aobv7-jays-projects-1d13f6e7.vercel.app/api/decision";
+const SAVE_ENDPOINT = "https://snm-image-review-backend-n86f-jojjaw2vy-jays-projects-1d13f6e7.vercel.app/api/decision";
 // =====================
 
 const usernameInput = document.getElementById("username");
