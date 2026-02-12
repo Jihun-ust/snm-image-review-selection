@@ -14,6 +14,8 @@ const decisionBtnDiv = document.getElementById("decisionBtnDiv");
 const acceptBtn = document.getElementById("acceptBtn");
 const denyBtn = document.getElementById("denyBtn");
 const statusEl = document.getElementById("status");
+const zoomRange = document.getElementById("zoomRange");
+const zoomValueEl = document.getElementById("zoomValue");
 
 let metadata = [];   // array of { filename, bend, rotate, vshift, imagePath }
 let currentIndex = 0;
@@ -49,12 +51,19 @@ function setButtonsDisabled(disabled) {
   denyBtn.disabled = disabled;
 }
 
+function resetZoom() {
+  zoomRange.value = 1;
+  imageEl.style.transform = 'scale(1)';
+  zoomValueEl.textContent = '1.0×';
+}
+
 function updateUI() {
   if (currentIndex < metadata.length) {
     imageEl.src = metadata[currentIndex].imagePath;
     imageCounterEl.textContent = `Image ${currentIndex + 1} of ${metadata.length}`;
     statusEl.textContent = "";
     setButtonsDisabled(false);
+    resetZoom();
   } else {
     imageEl.style.display = "none";
     decisionBtnDiv.style.display = "none";
@@ -63,6 +72,14 @@ function updateUI() {
     setButtonsDisabled(true);
   }
 }
+
+// ---------- zoom ----------
+
+zoomRange.addEventListener("input", () => {
+  const z = parseFloat(zoomRange.value);
+  imageEl.style.transform = `scale(${z})`;
+  zoomValueEl.textContent = `${z.toFixed(1)}×`;
+});
 
 // ---------- start ----------
 
