@@ -1,49 +1,210 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>SNM Image Review Beta</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <style>
-      body { 
-        font-family: sans-serif;
-        color: white;
-        max-width: 700px;
-        margin: 2rem auto;
-        background-color: rgb(34, 34, 34);
-      }
-      img { max-width: 100%; max-height: 100%; display: block; margin: 1rem 0; }
-      button { margin: 0.25rem; font-size: 15px }
-      .hidden { display: none; }
-    </style>
-  </head>
-  <body>
-    <h1>SNM Image Review - Beta</h1>
 
-    <div id="startBlock">
-      <p><strong>Instruction:</strong></p>
-      <p>You will review the series of synthetic fluoroscopy snapshot images. Press <strong>Accept</strong> or <strong>Reposition</strong></strong> to make your decision.</p>
-      <p>Enter your name to <strong>Start</strong> reviewing.</p>
-      <label>
-        Your name:
-        <input type="text" id="username" />
-      </label>
-      <button id="startBtn" style="padding: 10px">Start</button>
+<head>
+  <meta charset="UTF-8" />
+  <title>SNM Image Review Beta</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      color: #e4e4e7;
+      background: #18181b;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2.5rem 1.25rem;
+    }
+
+    /* ── header ── */
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: #f4f4f5;
+      margin-bottom: 2rem;
+    }
+
+    h1 span {
+      color: #a1a1aa;
+      font-weight: 400;
+    }
+
+    /* ── card ── */
+    .card {
+      width: 100%;
+      max-width: 640px;
+      background: #27272a;
+      border: 1px solid #3f3f46;
+      border-radius: 12px;
+      padding: 2rem;
+    }
+
+    /* ── start block ── */
+    #startBlock .instruction {
+      font-size: 0.875rem;
+      color: #a1a1aa;
+      line-height: 1.6;
+      margin-bottom: 1.5rem;
+    }
+
+    #startBlock .instruction strong {
+      color: #e4e4e7;
+    }
+
+    .input-group {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    #username {
+      flex: 1;
+      padding: 0.625rem 0.875rem;
+      font-size: 0.875rem;
+      font-family: inherit;
+      color: #f4f4f5;
+      background: #18181b;
+      border: 1px solid #3f3f46;
+      border-radius: 8px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    #username:focus {
+      border-color: #a78bfa;
+    }
+
+    #username::placeholder {
+      color: #52525b;
+    }
+
+    /* ── buttons ── */
+    .btn {
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 500;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s, opacity 0.2s, transform 0.1s;
+    }
+
+    .btn:active:not(:disabled) {
+      transform: scale(0.97);
+    }
+
+    .btn:disabled {
+      opacity: 0.45;
+      cursor: default;
+    }
+
+    .btn-primary {
+      padding: 0.625rem 1.5rem;
+      background: #7c3aed;
+      color: #fff;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: #6d28d9;
+    }
+
+    .btn-accept {
+      padding: 0.75rem 2rem;
+      background: #22c55e;
+      color: #fff;
+    }
+
+    .btn-accept:hover:not(:disabled) {
+      background: #16a34a;
+    }
+
+    .btn-reposition {
+      padding: 0.75rem 2rem;
+      background: #ef4444;
+      color: #fff;
+    }
+
+    .btn-reposition:hover:not(:disabled) {
+      background: #dc2626;
+    }
+
+    /* ── review area ── */
+    #imageCounter {
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: #a1a1aa;
+      margin-bottom: 1rem;
+      text-align: center;
+    }
+
+    #image {
+      width: 100%;
+      border-radius: 8px;
+      display: block;
+      margin-bottom: 1.25rem;
+    }
+
+    #decisionBtnDiv {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+    }
+
+    #status {
+      font-size: 0.8rem;
+      text-align: center;
+      color: #a1a1aa;
+      margin-top: 1rem;
+      min-height: 1.25rem;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>SNM Image Review <span>Beta</span></h1>
+
+  <div class="card" id="startBlock">
+    <p class="instruction">
+      You will review a series of synthetic fluoroscopy snapshot images.<br />
+      Press <strong>Accept</strong> or <strong>Reposition</strong> for each image.<br /><br />
+      Enter your name to begin.
+    </p>
+    <div class="input-group">
+      <input type="text" id="username" placeholder="Your name" />
+      <button id="startBtn" class="btn btn-primary">Start</button>
+    </div>
+  </div>
+
+  <div class="card hidden" id="app">
+    <p id="imageCounter"></p>
+    <img id="image" src="" alt="Current image" />
+
+    <div id="decisionBtnDiv">
+      <button id="acceptBtn" class="btn btn-accept">Accept</button>
+      <button id="denyBtn" class="btn btn-reposition">Reposition</button>
     </div>
 
-    <div id="app" class="hidden">
-      <p id="imageCounter"></p>
-      <img id="image" src="" alt="Current image" />
+    <p id="status"></p>
+  </div>
 
-      <div id="decisionBtnDiv">
-        <strong>Your Decision:</strong>
-        <button id="acceptBtn" style="padding: 15px">Accept</button>
-        <button id="denyBtn" style="padding: 15px">Reposition</button>
-      </div>
+  <script src="app.js"></script>
+</body>
 
-      <p id="status"></p>
-    </div>
-
-    <script src="app.js"></script>
-  </body>
 </html>

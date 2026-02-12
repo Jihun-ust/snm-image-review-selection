@@ -1,8 +1,5 @@
 // ====== CONFIG ======
-const IMAGES = Array.from({ length: 60 }, (_, i) => {
-  const num = (i + 1).toString().padStart(2, "0");
-  return `images/variation_${num}.png`;
-});
+const METADATA_URL = "images/metadata.csv";
 
 // Your backend endpoint that writes to MongoDB
 const SAVE_ENDPOINT = "https://snm-image-review-backend-n86f.vercel.app/api/decision";
@@ -18,8 +15,34 @@ const acceptBtn = document.getElementById("acceptBtn");
 const denyBtn = document.getElementById("denyBtn");
 const statusEl = document.getElementById("status");
 
+let metadata = [];   // array of { filename, bend, rotate, vshift, imagePath }
 let currentIndex = 0;
 let saving = false;
+
+// ---------- helpers ----------
+
+/** Parse CSV text into array of objects */
+function parseCSV(text) {
+  const lines = text.trim().split(/\r?\n/);
+  const headers = lines[0].split(",").map((h) => h.trim());
+  return lines.slice(1).map((line) => {
+    const vals = line.split(",").map((v) => v.trim());
+    const obj = {};
+    headers.forEach((h, i) => (obj[h] = vals[i]));
+    return obj;
+  });
+}
+
+/** Fisher-Yates (in-place) shuffle */
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// ---------- UI ----------
 
 function setButtonsDisabled(disabled) {
   acceptBtn.disabled = disabled;
@@ -27,9 +50,9 @@ function setButtonsDisabled(disabled) {
 }
 
 function updateUI() {
-  if (currentIndex < IMAGES.length) {
-    imageEl.src = IMAGES[currentIndex];
-    imageCounterEl.textContent = `Image ${currentIndex + 1} of ${IMAGES.length}`;
+  if (currentIndex < metadata.length) {
+    imageEl.src = metadata[currentIndex].imagePath;
+    imageCounterEl.textContent = `Image ${currentIndex + 1} of ${metadata.length}`;
     statusEl.textContent = "";
     setButtonsDisabled(false);
   } else {
@@ -41,28 +64,60 @@ function updateUI() {
   }
 }
 
-startBtn.addEventListener("click", () => {
+// ---------- start ----------
+
+startBtn.addEventListener("click", async () => {
   const username = usernameInput.value.trim();
   if (!username) {
     alert("Please enter your name first.");
     return;
   }
 
-  // hide block
-  document.getElementById("startBlock").style.display = "none";
+  try {
+    startBtn.disabled = true;
+    startBtn.textContent = "Loading…";
 
-  currentIndex = 0;
-  saving = false;
-  appDiv.classList.remove("hidden");
-  updateUI();
+    // Fetch and parse metadata
+    const res = await fetch(METADATA_URL);
+    if (!res.ok) throw new Error(`Failed to load metadata (HTTP ${res.status})`);
+    const csv = await res.text();
+    metadata = parseCSV(csv).map((row) => ({
+      filename: row.filename,
+      bend: parseFloat(row.bend),
+      rotate: parseFloat(row.rotate),
+      vshift: parseInt(row.vshift, 10),
+      imagePath: `images/${row.filename}.png`,
+    }));
+
+    // Shuffle for each session
+    shuffle(metadata);
+
+    // Show the review UI
+    document.getElementById("startBlock").style.display = "none";
+    currentIndex = 0;
+    saving = false;
+    appDiv.classList.remove("hidden");
+    updateUI();
+  } catch (err) {
+    console.error(err);
+    alert(`Could not load image metadata: ${err.message}`);
+    startBtn.disabled = false;
+    startBtn.textContent = "Start";
+  }
 });
 
-async function saveDecisionToMongo({ username, image, decision }) {
+// ---------- save ----------
+
+async function saveDecisionToMongo({ username, image, decision, meta }) {
   const payload = {
     timestamp: new Date().toISOString(),
     username,
     image,
     decision,
+    filename: meta.filename,
+    bend: meta.bend,
+    rotate: meta.rotate,
+    vshift: meta.vshift,
   };
 
   const res = await fetch(SAVE_ENDPOINT, {
@@ -75,7 +130,7 @@ async function saveDecisionToMongo({ username, image, decision }) {
   let data = null;
   try {
     data = await res.json();
-  } catch (_) {}
+  } catch (_) { }
 
   if (!res.ok || !data?.ok) {
     const msg = data?.error || `Save failed (HTTP ${res.status})`;
@@ -85,7 +140,7 @@ async function saveDecisionToMongo({ username, image, decision }) {
 
 async function recordAndAdvance(decision) {
   if (saving) return;
-  if (currentIndex >= IMAGES.length) return;
+  if (currentIndex >= metadata.length) return;
 
   const username = usernameInput.value.trim();
   if (!username) {
@@ -93,7 +148,7 @@ async function recordAndAdvance(decision) {
     return;
   }
 
-  const imagePath = IMAGES[currentIndex];
+  const currentMeta = metadata[currentIndex];
 
   try {
     saving = true;
@@ -102,8 +157,9 @@ async function recordAndAdvance(decision) {
 
     await saveDecisionToMongo({
       username,
-      image: imagePath,
+      image: currentMeta.imagePath,
       decision, // "accept" or "reposition"
+      meta: currentMeta,
     });
 
     // Advance immediately after successful save
