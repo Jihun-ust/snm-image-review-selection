@@ -98,7 +98,9 @@ startBtn.addEventListener("click", async () => {
       bend: parseFloat(row.bend),
       rotate: parseFloat(row.rotate),
       vshift: parseInt(row.vshift, 10),
-      imagePath: `images/${row.filename}.png`,
+      imagePath: `${row.filename}`,
+      angle: parseFloat(row.angle),
+      deptn: parseFloat(row.deptn),
     }));
 
     // Shuffle for each session
@@ -120,16 +122,17 @@ startBtn.addEventListener("click", async () => {
 
 // ---------- save ----------
 
-async function saveDecisionToMongo({ sessionId, image, decision, meta }) {
+async function saveDecisionToMongo({ sessionId, decision, meta }) {
   const payload = {
     timestamp: new Date().toISOString(),
     sessionId,
-    image,
     decision,
     filename: meta.filename,
     bend: meta.bend,
     rotate: meta.rotate,
     vshift: meta.vshift,
+    angle: meta.angle,
+    depth: meta.depth,
   };
 
   const res = await fetch(SAVE_ENDPOINT, {
@@ -163,7 +166,6 @@ async function recordAndAdvance(decision) {
 
     await saveDecisionToMongo({
       sessionId,
-      image: currentMeta.imagePath,
       decision, // "accept" or "reposition"
       meta: currentMeta,
     });
