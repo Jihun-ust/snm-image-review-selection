@@ -98,9 +98,9 @@ startBtn.addEventListener("click", async () => {
       bend: parseFloat(row.bend),
       rotate: parseFloat(row.rotate),
       vshift: parseInt(row.vshift, 10),
-      imagePath: `${row.filename}`,
+      imagePath: `/images/${row.filename}.png`,
       angle: parseFloat(row.angle),
-      deptn: parseFloat(row.deptn),
+      depth: parseFloat(row.depth),
     }));
 
     // Shuffle for each session
