@@ -5,7 +5,7 @@ const METADATA_URL = "images/metadata.csv";
 const SAVE_ENDPOINT = "https://snm-image-review-backend-n86f.vercel.app/api/decision";
 // =====================
 
-const usernameInput = document.getElementById("username");
+const sessionId = crypto.randomUUID();
 const startBtn = document.getElementById("startBtn");
 const appDiv = document.getElementById("app");
 const imageEl = document.getElementById("image");
@@ -84,11 +84,6 @@ zoomRange.addEventListener("input", () => {
 // ---------- start ----------
 
 startBtn.addEventListener("click", async () => {
-  const username = usernameInput.value.trim();
-  if (!username) {
-    alert("Please enter your name first.");
-    return;
-  }
 
   try {
     startBtn.disabled = true;
@@ -125,10 +120,10 @@ startBtn.addEventListener("click", async () => {
 
 // ---------- save ----------
 
-async function saveDecisionToMongo({ username, image, decision, meta }) {
+async function saveDecisionToMongo({ sessionId, image, decision, meta }) {
   const payload = {
     timestamp: new Date().toISOString(),
-    username,
+    sessionId,
     image,
     decision,
     filename: meta.filename,
@@ -159,12 +154,6 @@ async function recordAndAdvance(decision) {
   if (saving) return;
   if (currentIndex >= metadata.length) return;
 
-  const username = usernameInput.value.trim();
-  if (!username) {
-    alert("Missing username.");
-    return;
-  }
-
   const currentMeta = metadata[currentIndex];
 
   try {
@@ -173,7 +162,7 @@ async function recordAndAdvance(decision) {
     statusEl.textContent = "Saving...";
 
     await saveDecisionToMongo({
-      username,
+      sessionId,
       image: currentMeta.imagePath,
       decision, // "accept" or "reposition"
       meta: currentMeta,
