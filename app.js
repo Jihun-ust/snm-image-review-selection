@@ -98,7 +98,7 @@ startBtn.addEventListener("click", async () => {
       bend: parseFloat(row.bend),
       rotate: parseFloat(row.rotate),
       vshift: parseInt(row.vshift, 10),
-      imagePath: `/images/${row.filename}.png`,
+      imagePath: `./images/${row.filename}.png`,
       angle: parseFloat(row.angle),
       depth: parseFloat(row.depth),
     }));
