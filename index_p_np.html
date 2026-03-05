@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>SNM Image Review Beta</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      color: #e4e4e7;
+      background: #18181b;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1.5rem 1.25rem;
+    }
+
+    /* ── header ── */
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: #f4f4f5;
+      margin-bottom: 2rem;
+    }
+
+    h1 span {
+      color: #a1a1aa;
+      font-weight: 400;
+    }
+
+    /* ── card ── */
+    .card {
+      width: 100%;
+      max-width: 900px;
+      background: #27272a;
+      border: 1px solid #3f3f46;
+      border-radius: 12px;
+      padding: 1.5rem 2rem;
+    }
+
+    #app.card {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    /* ── start block ── */
+    #startBlock .instruction {
+      font-size: 0.875rem;
+      color: #a1a1aa;
+      line-height: 1.6;
+      margin-bottom: 1.5rem;
+    }
+
+    #startBlock .instruction strong {
+      color: #e4e4e7;
+    }
+
+    .input-group {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      justify-content: center;
+    }
+
+
+
+    /* ── buttons ── */
+    .btn {
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 500;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s, opacity 0.2s, transform 0.1s;
+    }
+
+    .btn:active:not(:disabled) {
+      transform: scale(0.97);
+    }
+
+    .btn:disabled {
+      opacity: 0.45;
+      cursor: default;
+    }
+
+    .btn-primary {
+      padding: 0.625rem 1.5rem;
+      background: #7c3aed;
+      color: #fff;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: #6d28d9;
+    }
+
+    .btn-accept {
+      padding: 0.75rem 2rem;
+      background: #22c55e;
+      color: #fff;
+    }
+
+    .btn-accept:hover:not(:disabled) {
+      background: #16a34a;
+    }
+
+    .btn-reposition {
+      padding: 0.75rem 2rem;
+      background: #ef4444;
+      color: #fff;
+    }
+
+    .btn-reposition:hover:not(:disabled) {
+      background: #dc2626;
+    }
+
+    /* ── review area ── */
+    #imageCounter {
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: #a1a1aa;
+      margin-bottom: 1rem;
+      text-align: center;
+    }
+
+    .image-row {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      gap: 0.75rem;
+      align-items: stretch;
+      margin-bottom: 1rem;
+    }
+
+    .image-viewport {
+      flex: 1;
+      min-width: 0;
+      overflow: auto;
+      border-radius: 8px;
+      background: #1a1a1d;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #image {
+      display: block;
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      border-radius: 8px;
+      transform-origin: center center;
+      transition: transform 0.15s ease;
+    }
+
+    /* ── magnification slider ── */
+    .zoom-slider-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      width: 72px;
+      max-height: 75%;
+      align-self: center;
+      flex-shrink: 0;
+    }
+
+    .zoom-slider-wrap label {
+      font-size: 0.65rem;
+      font-weight: 600;
+      color: #a1a1aa;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      writing-mode: vertical-lr;
+      transform: rotate(180deg);
+    }
+
+    #zoomRange {
+      writing-mode: vertical-lr;
+      direction: rtl;
+      appearance: slider-vertical;
+      width: 12px;
+      flex: 1;
+      min-height: 60px;
+      accent-color: #7c3aed;
+      cursor: pointer;
+    }
+
+    .zoom-value {
+      font-size: 0.7rem;
+      font-weight: 500;
+      color: #e4e4e7;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #decisionBtnDiv {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+    }
+
+    #status {
+      font-size: 0.8rem;
+      text-align: center;
+      color: #a1a1aa;
+      margin-top: 1rem;
+      min-height: 1.25rem;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>SNM Image Review <span>Beta</span></h1>
+
+  <div class="card" id="startBlock">
+    <p class="instruction">
+      You will review a series of synthetic fluoroscopy snapshot images.<br />
+      Press <strong>Possible</strong> or <strong>Not Possible</strong> for each image.
+    </p>
+    <div class="input-group">
+      <button id="startBtn" class="btn btn-primary">Start</button>
+    </div>
+  </div>
+
+  <div class="card hidden" id="app">
+    <p id="imageCounter"></p>
+    <div class="image-row">
+      <div class="image-viewport" id="imageViewport">
+        <img id="image" src="" alt="Current image" />
+      </div>
+      <div class="zoom-slider-wrap">
+        <label for="zoomRange">Zoom</label>
+        <input type="range" id="zoomRange" min="1" max="5" step="0.1" value="1" />
+        <span class="zoom-value" id="zoomValue">1.0×</span>
+      </div>
+    </div>
+
+    <div id="decisionBtnDiv">
+      <button id="acceptBtn" class="btn btn-accept">Possible</button>
+      <button id="denyBtn" class="btn btn-reposition">Not Possible</button>
+    </div>
+
+    <p id="status"></p>
+  </div>
+
+  <script src="app_p_np.js"></script>
+</body>
+
+</html>
