@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SNM Image Review Survey Analysis</title>
+    <!-- Google Fonts for Modern Typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Main CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="logo">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M21 21H3V3H5V19H21V21ZM15 15H17V10H15V15ZM11 15H13V7H11V15ZM7 15H9V12H7V15Z" fill="currentColor"/>
+                </svg>
+                <h1>SNM Image Review Survey Analysis</h1>
+            </div>
+            <button id="referenceBtn" class="reference-btn">Reference</button>
+        </header>
+
+        <main class="dashboard">
+            <div class="dashboard-content" id="dashboardContent" style="display: none;">
+                <div class="left-panel">
+                    <div class="dashboard-stats" id="dashboardStats">
+                        <div class="stat-card">
+                            <h3>Total Sessions Analyzed</h3>
+                            <p id="totalSessions">0</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Total Records Processed</h3>
+                            <p id="totalRecords">0</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Overall Avg Time</h3>
+                            <p id="overallAvgTime">0.00s</p>
+                        </div>
+                    </div>
+
+                    <div class="table-container" id="tableContainer">
+                        <table id="resultsTable">
+                            <thead>
+                                <tr>
+                                    <th class="checkbox-col">
+                                        <input type="checkbox" id="selectAllCheckbox" checked title="Select All">
+                                    </th>
+                                    <th>Date</th>
+                                    <th>Session ID</th>
+                                    <th>Total Records</th>
+                                    <th>Avg Decision Time (sec)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="resultsBody">
+                                <!-- Rows will be dynamically populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="right-panel">
+                    <div class="chart-container" id="chartContainer">
+                        <canvas id="scatterPlot"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="empty-state" id="emptyState">
+                <div class="empty-icon">📁</div>
+                <h2>Upload CSV Data</h2>
+                <p>Drag and drop your file here, or click to upload</p>
+                <p class="small-text">Note: Only sessions on or after April 1st, 2026 with 50+ records will be shown.</p>
+                <div style="margin-top: 1.5rem;">
+                    <label for="csvFileInput" class="custom-file-upload">
+                        Browse Files
+                    </label>
+                    <input type="file" id="csvFileInput" accept=".csv" />
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Image Overlay -->
+    <div id="imageOverlay" class="image-overlay" style="display: none;">
+        <div class="overlay-content">
+            <span id="closeOverlayBtn" class="close-overlay">&times;</span>
+            <img src="img/reference.png" alt="Reference Image">
+        </div>
+    </div>
+
+    <!-- Chart.js for data visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- PapaParse for robust CSV parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <!-- App Logic -->
+    <script src="app.js"></script>
+</body>
+</html>
