@@ -61,7 +61,21 @@
 
                 <div class="right-panel">
                     <div class="chart-container" id="chartContainer">
-                        <canvas id="scatterPlot"></canvas>
+                        <div class="chart-canvas-wrap">
+                            <canvas id="scatterPlot"></canvas>
+                        </div>
+                        <div class="toggle-row">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="heatmapToggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span class="toggle-row-label">Show Decision Time Heatmap</span>
+                        </div>
+                        <div class="heatmap-legend" id="heatmapLegendRow" style="visibility: hidden;">
+                            <span id="heatmapMinLabel">0.0s</span>
+                            <div class="heatmap-legend-gradient"></div>
+                            <span id="heatmapMaxLabel">0.0s</span>
+                        </div>
                     </div>
                 </div>
             </div>

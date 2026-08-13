@@ -6,6 +6,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultsBody = document.getElementById('resultsBody');
     const selectAllCheckbox = document.getElementById('selectAllCheckbox');
     const chartContainer = document.getElementById('chartContainer');
+    const heatmapToggle = document.getElementById('heatmapToggle');
+    const heatmapLegendRow = document.getElementById('heatmapLegendRow');
     
     // Stats Elements
     const totalSessionsEl = document.getElementById('totalSessions');
@@ -52,6 +54,12 @@ document.addEventListener('DOMContentLoaded', () => {
             document.querySelectorAll('.session-checkbox').forEach(cb => {
                 cb.checked = isChecked;
             });
+            renderScatterPlot();
+        });
+    }
+
+    if (heatmapToggle) {
+        heatmapToggle.addEventListener('change', () => {
             renderScatterPlot();
         });
     }
@@ -139,27 +147,59 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // 3. Process rules and calculate metrics
+        // 3. Compute avg decision time for every session (used below as the
+        // fallback decision time for each session's first record)
+        sessionMap.forEach(sessionData => {
+            const durationSec = (sessionData.maxTime - sessionData.minTime) / 1000;
+            sessionData.durationSec = durationSec;
+            sessionData.avgDecisionTimeSec = durationSec / sessionData.count;
+        });
+
+        // 4. Process rules and calculate metrics
         globalValidSessions = [];
 
         sessionMap.forEach((sessionData, sessionId) => {
             // Rule: exclude less than 50 records
             if (sessionData.count >= 50) {
-                const durationMs = sessionData.maxTime - sessionData.minTime;
-                const durationSec = durationMs / 1000;
-                const avgDecisionTimeSec = durationSec / sessionData.count;
-
                 globalValidSessions.push({
                     sessionId,
                     date: sessionData.minTime.toISOString().split('T')[0],
                     count: sessionData.count,
-                    totalTime: durationSec,
-                    avgDecisionTimeSec
+                    totalTime: sessionData.durationSec,
+                    avgDecisionTimeSec: sessionData.avgDecisionTimeSec
                 });
             }
         });
 
-        // 4. Render UI
+        // 5. Compute per-record decision time: gap since the previous record
+        // in the same session (sorted by timestamp); the first record of a
+        // session falls back to that session's average decision time.
+        const rowsBySession = new Map();
+        globalFilteredData.forEach(row => {
+            const sid = row.sessionId;
+            if (!sid) return;
+            if (!rowsBySession.has(sid)) rowsBySession.set(sid, []);
+            rowsBySession.get(sid).push(row);
+        });
+
+        rowsBySession.forEach((rows, sid) => {
+            const sessionData = sessionMap.get(sid);
+            if (!sessionData) return;
+
+            rows.sort((a, b) => parseTimestamp(a.timestamp) - parseTimestamp(b.timestamp));
+
+            rows.forEach((row, i) => {
+                if (i === 0) {
+                    row.decisionTimeSec = sessionData.avgDecisionTimeSec;
+                } else {
+                    const prevTs = parseTimestamp(rows[i - 1].timestamp);
+                    const ts = parseTimestamp(row.timestamp);
+                    row.decisionTimeSec = (ts - prevTs) / 1000;
+                }
+            });
+        });
+
+        // 6. Render UI
         renderDashboard(globalValidSessions);
     }
 
@@ -254,63 +294,97 @@ document.addEventListener('DOMContentLoaded', () => {
         overallAvgTimeEl.textContent = overallAvg.toFixed(2) + 's';
 
         const chartData = globalFilteredData.filter(row => checkedSessions.has(row.sessionId));
-        
+
+        const heatmapMode = !!(heatmapToggle && heatmapToggle.checked);
+
         const acceptData = [];
         const repositionData = [];
-        
+        let minTime = Infinity;
+        let maxTime = -Infinity;
+
         chartData.forEach(row => {
             const angle = parseFloat(row.rotate);
             const depth = parseFloat(row.depth);
             if (isNaN(angle) || isNaN(depth)) return;
-            
-            const pt = { 
-                x: angle, 
-                y: depth, 
+
+            const decisionTimeSec = row.decisionTimeSec;
+            const pt = {
+                x: angle,
+                y: depth,
                 filename: row.filename,
-                sessionShort: row.sessionId ? row.sessionId.substring(0, 4) : 'N/A'
+                sessionShort: row.sessionId ? row.sessionId.substring(0, 4) : 'N/A',
+                decisionTimeSec
             };
+
+            if (heatmapMode && decisionTimeSec != null && !isNaN(decisionTimeSec)) {
+                if (decisionTimeSec < minTime) minTime = decisionTimeSec;
+                if (decisionTimeSec > maxTime) maxTime = decisionTimeSec;
+            }
+
             if (row.decision === 'accept') {
                 acceptData.push(pt);
             } else if (row.decision === 'reposition') {
                 repositionData.push(pt);
             }
         });
-        
+
         if (acceptData.length > 0 || repositionData.length > 0) {
-            chartContainer.style.display = 'block';
+            chartContainer.style.display = 'flex';
         } else {
             chartContainer.style.display = 'none';
         }
 
+        if (heatmapLegendRow) {
+            heatmapLegendRow.style.visibility = heatmapMode ? 'visible' : 'hidden';
+        }
+        if (heatmapMode && isFinite(minTime) && isFinite(maxTime)) {
+            updateHeatmapLegend(minTime, maxTime);
+        }
+        const timeRange = (maxTime - minTime) || 1;
+
+        function styleDataset(label, data, shape, plainColor, plainBorderColor) {
+            if (heatmapMode) {
+                const colors = data.map(p => {
+                    if (p.decisionTimeSec == null || isNaN(p.decisionTimeSec)) return 'rgba(148, 163, 184, 0.4)';
+                    return decisionTimeToColor((p.decisionTimeSec - minTime) / timeRange);
+                });
+                return {
+                    label,
+                    data,
+                    pointStyle: shape,
+                    backgroundColor: colors,
+                    borderColor: 'rgba(255, 255, 255, 0.25)',
+                    borderWidth: 1,
+                    pointRadius: 6,
+                    pointHoverRadius: 8
+                };
+            }
+            return {
+                label,
+                data,
+                pointStyle: shape,
+                backgroundColor: plainColor,
+                borderColor: plainBorderColor,
+                borderWidth: shape === 'circle' ? 2 : 1,
+                pointRadius: 6,
+                pointHoverRadius: 8
+            };
+        }
+
+        const datasets = [
+            styleDataset('Accept', acceptData, 'circle', 'transparent', '#3b82f6'),
+            styleDataset('Reposition', repositionData, 'triangle', '#ef4444', '#dc2626')
+        ];
+
         const ctx = document.getElementById('scatterPlot').getContext('2d');
-        
+
         if (scatterChart) {
-            scatterChart.data.datasets[0].data = acceptData;
-            scatterChart.data.datasets[1].data = repositionData;
+            scatterChart.data.datasets = datasets;
             scatterChart.update();
         } else {
             scatterChart = new Chart(ctx, {
                 type: 'scatter',
-                data: {
-                    datasets: [
-                        {
-                            label: 'Accept',
-                            data: acceptData,
-                            backgroundColor: 'transparent', // do not fill
-                            borderColor: '#3b82f6', // blue
-                            borderWidth: 2,
-                            pointRadius: 6, // slightly larger
-                            pointHoverRadius: 8
-                        },
-                        {
-                            label: 'Reposition',
-                            data: repositionData,
-                            backgroundColor: '#ef4444', // red
-                            borderColor: '#dc2626',
-                            borderWidth: 1
-                        }
-                    ]
-                },
+                data: { datasets },
                 options: {
                     animation: false,
                     responsive: true,
@@ -331,14 +405,29 @@ document.addEventListener('DOMContentLoaded', () => {
                     },
                     plugins: {
                         legend: {
-                            labels: { color: '#f8fafc' }
+                            labels: {
+                                color: '#f8fafc',
+                                usePointStyle: true,
+                                generateLabels: function(chart) {
+                                    return chart.data.datasets.map((dataset, i) => ({
+                                        text: dataset.label,
+                                        fillStyle: Array.isArray(dataset.backgroundColor) ? 'rgba(226, 232, 240, 0.7)' : dataset.backgroundColor,
+                                        strokeStyle: dataset.borderColor,
+                                        lineWidth: dataset.borderWidth,
+                                        pointStyle: dataset.pointStyle,
+                                        hidden: !chart.isDatasetVisible(i),
+                                        datasetIndex: i
+                                    }));
+                                }
+                            }
                         },
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
                                     const pt = context.raw;
                                     const fname = pt.filename || 'Unknown File';
-                                    return `ID: ${pt.sessionShort} | ${fname}`;
+                                    const base = `ID: ${pt.sessionShort} | ${fname}`;
+                                    return pt.decisionTimeSec != null ? `${base} | ${pt.decisionTimeSec.toFixed(2)}s` : base;
                                 }
                             }
                         }
@@ -346,5 +435,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         }
+    }
+
+    // Sequential blue ramp (light = fast, dark = slow), see dataviz skill palette
+    const HEATMAP_RAMP = ['#cde2fb', '#5598e7', '#1c5cab', '#0d366b'];
+
+    function hexToRgb(hex) {
+        const n = parseInt(hex.slice(1), 16);
+        return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    }
+
+    function decisionTimeToColor(t) {
+        const clamped = Math.max(0, Math.min(1, t));
+        const segments = HEATMAP_RAMP.length - 1;
+        const scaled = clamped * segments;
+        const idx = Math.min(Math.floor(scaled), segments - 1);
+        const localT = scaled - idx;
+        const c0 = hexToRgb(HEATMAP_RAMP[idx]);
+        const c1 = hexToRgb(HEATMAP_RAMP[idx + 1]);
+        const r = Math.round(c0[0] + (c1[0] - c0[0]) * localT);
+        const g = Math.round(c0[1] + (c1[1] - c0[1]) * localT);
+        const b = Math.round(c0[2] + (c1[2] - c0[2]) * localT);
+        return `rgb(${r}, ${g}, ${b})`;
+    }
+
+    function updateHeatmapLegend(minTime, maxTime) {
+        const minLabel = document.getElementById('heatmapMinLabel');
+        const maxLabel = document.getElementById('heatmapMaxLabel');
+        if (minLabel) minLabel.textContent = minTime.toFixed(2) + 's';
+        if (maxLabel) maxLabel.textContent = maxTime.toFixed(2) + 's';
     }
 });
