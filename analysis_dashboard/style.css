@@ -338,6 +338,31 @@ input[type="checkbox"] {
     font-weight: 500;
 }
 
+.toggle-group {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-left: 1.5rem;
+}
+
+.margin-control {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: 0.75rem;
+}
+
+.margin-control input[type="range"] {
+    width: 120px;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
+.margin-control .toggle-row-label {
+    min-width: 3rem;
+    font-variant-numeric: tabular-nums;
+}
+
 .toggle-switch {
     position: relative;
     display: inline-block;

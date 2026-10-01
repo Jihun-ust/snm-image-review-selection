@@ -8,7 +8,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const chartContainer = document.getElementById('chartContainer');
     const heatmapToggle = document.getElementById('heatmapToggle');
     const heatmapLegendRow = document.getElementById('heatmapLegendRow');
-    
+    const stdToggle = document.getElementById('stdToggle');
+    const stdToggleGroup = document.getElementById('stdToggleGroup');
+    const acceptToggle = document.getElementById('acceptToggle');
+    const acceptToggleGroup = document.getElementById('acceptToggleGroup');
+    const acceptMarginControl = document.getElementById('acceptMarginControl');
+    const acceptMarginSlider = document.getElementById('acceptMarginSlider');
+    const acceptMarginValue = document.getElementById('acceptMarginValue');
+
     // Stats Elements
     const totalSessionsEl = document.getElementById('totalSessions');
     const totalRecordsEl = document.getElementById('totalRecords');
@@ -47,6 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let globalFilteredData = [];
     let globalValidSessions = [];
     let scatterChart = null;
+    let stdEllipses = null; // { center: {x, y}, rings: [{ label, points }], color } or null when hidden
 
     if (selectAllCheckbox) {
         selectAllCheckbox.addEventListener('change', (e) => {
@@ -60,6 +68,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (heatmapToggle) {
         heatmapToggle.addEventListener('change', () => {
+            renderScatterPlot();
+        });
+    }
+
+    if (stdToggle) {
+        stdToggle.addEventListener('change', () => {
+            renderScatterPlot();
+        });
+    }
+
+    if (acceptToggle) {
+        acceptToggle.addEventListener('change', () => {
+            renderScatterPlot();
+        });
+    }
+
+    if (acceptMarginSlider) {
+        acceptMarginSlider.addEventListener('input', () => {
             renderScatterPlot();
         });
     }
@@ -342,6 +368,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const timeRange = (maxTime - minTime) || 1;
 
+        if (stdToggleGroup) {
+            stdToggleGroup.style.display = heatmapMode ? 'flex' : 'none';
+        }
+        if (acceptToggleGroup) {
+            acceptToggleGroup.style.display = heatmapMode ? 'none' : 'flex';
+        }
+        if (heatmapMode) {
+            stdEllipses = (stdToggle && stdToggle.checked)
+                ? computeStdEllipses(acceptData.concat(repositionData)) : null;
+        } else {
+            const acceptMode = !!(acceptToggle && acceptToggle.checked);
+            const marginPct = acceptMarginSlider ? Number(acceptMarginSlider.value) : 25;
+            if (acceptMarginControl) acceptMarginControl.style.display = acceptMode ? 'flex' : 'none';
+            if (acceptMarginValue) acceptMarginValue.textContent = `±${marginPct}%`;
+            stdEllipses = acceptMode ? computeAcceptEllipses(acceptData, marginPct) : null;
+        }
+
         function styleDataset(label, data, shape, plainColor, plainBorderColor) {
             if (heatmapMode) {
                 const colors = data.map(p => {
@@ -385,6 +428,7 @@ document.addEventListener('DOMContentLoaded', () => {
             scatterChart = new Chart(ctx, {
                 type: 'scatter',
                 data: { datasets },
+                plugins: [stdEllipsePlugin],
                 options: {
                     animation: false,
                     responsive: true,
@@ -436,6 +480,189 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     }
+
+    // Std boundaries: 1σ/2σ/3σ ellipses of where slow decisions concentrate in
+    // angle-depth space. Each point is weighted by its decision time above the
+    // median (capped at the 95th percentile so a single long pause can't
+    // dominate); points at or below the median get zero weight.
+    const STD_LEVELS = [1, 2, 3];
+    const STD_LINE_DASHES = [[], [8, 5], [2, 4]];
+    const STD_ELLIPSE_SEGMENTS = 72;
+
+    function computeStdEllipses(points) {
+        const valid = points.filter(p => p.decisionTimeSec != null && !isNaN(p.decisionTimeSec));
+        if (valid.length < 3) return null;
+
+        const times = valid.map(p => p.decisionTimeSec).sort((a, b) => a - b);
+        const mid = Math.floor(times.length / 2);
+        const median = times.length % 2 ? times[mid] : (times[mid - 1] + times[mid]) / 2;
+
+        const excess = valid.map(p => Math.max(0, p.decisionTimeSec - median));
+        const positive = excess.filter(w => w > 0).sort((a, b) => a - b);
+        if (positive.length < 3) return null;
+        const cap = positive[Math.floor(0.95 * (positive.length - 1))];
+        const weights = excess.map(w => Math.min(w, cap));
+
+        let wSum = 0, mx = 0, my = 0;
+        valid.forEach((p, i) => {
+            wSum += weights[i];
+            mx += weights[i] * p.x;
+            my += weights[i] * p.y;
+        });
+        if (wSum <= 0) return null;
+        mx /= wSum;
+        my /= wSum;
+
+        let sxx = 0, sxy = 0, syy = 0;
+        valid.forEach((p, i) => {
+            const dx = p.x - mx;
+            const dy = p.y - my;
+            sxx += weights[i] * dx * dx;
+            sxy += weights[i] * dx * dy;
+            syy += weights[i] * dy * dy;
+        });
+        sxx /= wSum;
+        sxy /= wSum;
+        syy /= wSum;
+
+        return buildEllipseRings(mx, my, sxx, sxy, syy,
+            STD_LEVELS.map(k => ({ scale: k, label: `${k}σ` })), 'rgba(248, 250, 252, 0.85)');
+    }
+
+    // Accept boundaries (default mode): an ellipse fitted to the accept points
+    // (unweighted mean + covariance), sized to enclose 90% of them, plus one
+    // ring marginPct% tighter and one marginPct% more generous (slider-driven).
+    const ACCEPT_COVERAGE = 0.9;
+
+    function computeAcceptEllipses(points, marginPct) {
+        const n = points.length;
+        if (n < 3) return null;
+
+        let mx = 0, my = 0;
+        points.forEach(p => {
+            mx += p.x;
+            my += p.y;
+        });
+        mx /= n;
+        my /= n;
+
+        let sxx = 0, sxy = 0, syy = 0;
+        points.forEach(p => {
+            const dx = p.x - mx;
+            const dy = p.y - my;
+            sxx += dx * dx;
+            sxy += dx * dy;
+            syy += dy * dy;
+        });
+        sxx /= n;
+        sxy /= n;
+        syy /= n;
+
+        const det = sxx * syy - sxy * sxy;
+        if (!(det > 1e-9)) return null;
+
+        // Mahalanobis distance of every accept point; the 90th percentile is
+        // the ellipse scale that encloses 90% of them.
+        const dists = points.map(p => {
+            const dx = p.x - mx;
+            const dy = p.y - my;
+            return Math.sqrt((syy * dx * dx - 2 * sxy * dx * dy + sxx * dy * dy) / det);
+        }).sort((a, b) => a - b);
+        const base = dists[Math.max(0, Math.ceil(ACCEPT_COVERAGE * n) - 1)];
+        if (!(base > 0)) return null;
+
+        const margin = marginPct / 100;
+        return buildEllipseRings(mx, my, sxx, sxy, syy, [
+            { scale: base, label: 'Acceptance boundary' },
+            { scale: base * (1 - margin), label: `-${marginPct}%` },
+            { scale: base * (1 + margin), label: `+${marginPct}%` }
+        ], '#3b82f6');
+    }
+
+    // Ellipse rings from a 2x2 covariance matrix; each level's `scale` is the
+    // ring radius in standard deviations along the principal axes.
+    function buildEllipseRings(mx, my, sxx, sxy, syy, levels, color) {
+        const half = (sxx + syy) / 2;
+        const diff = Math.sqrt(((sxx - syy) / 2) ** 2 + sxy * sxy);
+        const l1 = half + diff;
+        const l2 = half - diff;
+        if (!(l2 > 1e-9)) return null; // degenerate (points on a line)
+
+        const theta = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+        const cosT = Math.cos(theta);
+        const sinT = Math.sin(theta);
+        const r1 = Math.sqrt(l1);
+        const r2 = Math.sqrt(l2);
+
+        const rings = levels.map(level => {
+            const pts = [];
+            for (let i = 0; i < STD_ELLIPSE_SEGMENTS; i++) {
+                const t = (i / STD_ELLIPSE_SEGMENTS) * 2 * Math.PI;
+                const a = level.scale * r1 * Math.cos(t);
+                const b = level.scale * r2 * Math.sin(t);
+                pts.push({ x: mx + a * cosT - b * sinT, y: my + a * sinT + b * cosT });
+            }
+            return { label: level.label, points: pts };
+        });
+
+        return { center: { x: mx, y: my }, rings, color };
+    }
+
+    const stdEllipsePlugin = {
+        id: 'stdEllipse',
+        afterDatasetsDraw(chart) {
+            if (!stdEllipses) return;
+            const { ctx, chartArea, scales } = chart;
+            const color = stdEllipses.color;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(chartArea.left, chartArea.top, chartArea.right - chartArea.left, chartArea.bottom - chartArea.top);
+            ctx.clip();
+
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = 1.5;
+            ctx.font = '600 11px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+
+            stdEllipses.rings.forEach((ring, idx) => {
+                const px = ring.points.map(p => ({
+                    x: scales.x.getPixelForValue(p.x),
+                    y: scales.y.getPixelForValue(p.y)
+                }));
+
+                ctx.setLineDash(STD_LINE_DASHES[idx]);
+                ctx.beginPath();
+                px.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+                ctx.closePath();
+                ctx.stroke();
+
+                // Label at the highest point of the ring that is still inside the plot
+                let anchor = null;
+                px.forEach(p => {
+                    const inside = p.x >= chartArea.left + 32 && p.x <= chartArea.right - 32 &&
+                        p.y >= chartArea.top + 14 && p.y <= chartArea.bottom;
+                    if (inside && (!anchor || p.y < anchor.y)) anchor = p;
+                });
+                if (anchor) ctx.fillText(ring.label, anchor.x, anchor.y - 3);
+            });
+
+            // Center marker
+            const cx = scales.x.getPixelForValue(stdEllipses.center.x);
+            const cy = scales.y.getPixelForValue(stdEllipses.center.y);
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.moveTo(cx - 5, cy);
+            ctx.lineTo(cx + 5, cy);
+            ctx.moveTo(cx, cy - 5);
+            ctx.lineTo(cx, cy + 5);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+    };
 
     // Sequential blue ramp (light = fast, dark = slow), see dataviz skill palette
     const HEATMAP_RAMP = ['#cde2fb', '#5598e7', '#1c5cab', '#0d366b'];

@@ -70,6 +70,24 @@
                                 <span class="toggle-slider"></span>
                             </label>
                             <span class="toggle-row-label">Show Decision Time Heatmap</span>
+                            <div class="toggle-group" id="acceptToggleGroup">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="acceptToggle">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <span class="toggle-row-label">Show Accept Boundaries</span>
+                                <div class="margin-control" id="acceptMarginControl" style="display: none;">
+                                    <input type="range" id="acceptMarginSlider" min="10" max="50" step="5" value="25" title="Boundary margin">
+                                    <span class="toggle-row-label" id="acceptMarginValue">±25%</span>
+                                </div>
+                            </div>
+                            <div class="toggle-group" id="stdToggleGroup" style="display: none;">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="stdToggle" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <span class="toggle-row-label">Show Std Boundaries (1σ, 2σ, 3σ)</span>
+                            </div>
                         </div>
                         <div class="heatmap-legend" id="heatmapLegendRow" style="visibility: hidden;">
                             <span id="heatmapMinLabel">0.0s</span>
