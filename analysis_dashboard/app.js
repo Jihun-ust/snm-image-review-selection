@@ -43,12 +43,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const markerImagePanel = document.getElementById('markerImagePanel');
     const markerImage = document.getElementById('markerImage');
     const markerImageTitle = document.getElementById('markerImageTitle');
+    const markerImageMeta = document.getElementById('markerImageMeta');
     const markerImageError = document.getElementById('markerImageError');
     const closeMarkerImageBtn = document.getElementById('closeMarkerImageBtn');
 
     function openMarkerImage(pt) {
         if (!pt || !pt.filename) return;
-        markerImageTitle.textContent = `Angle ${pt.x} · Depth ${pt.y}`;
+        markerImageTitle.textContent = pt.filename;
+        markerImageTitle.title = pt.filename; // full name on hover if truncated
+        markerImageMeta.textContent = `Angle ${pt.x} · Depth ${pt.y}`;
+        positionMarkerImagePanel();
         markerImageError.hidden = true;
         markerImage.hidden = false;
         markerImage.alt = pt.filename;
@@ -56,6 +60,30 @@ document.addEventListener('DOMContentLoaded', () => {
         markerImagePanel.classList.add('open');
         markerImagePanel.setAttribute('aria-hidden', 'false');
     }
+
+    // Open just below the page header (or near the top once it has scrolled away),
+    // aligned with the table; capped at the table's width and the chart frame's height.
+    function positionMarkerImagePanel() {
+        const header = document.querySelector('.app-header');
+        const headerBottom = header ? header.getBoundingClientRect().bottom : 0;
+        markerImagePanel.style.top = `${Math.max(16, headerBottom + 16)}px`;
+
+        const table = document.getElementById('tableContainer');
+        const chart = document.getElementById('chartContainer');
+        const tableRect = table ? table.getBoundingClientRect() : null;
+        const chartRect = chart ? chart.getBoundingClientRect() : null;
+        if (tableRect && tableRect.width > 0) {
+            markerImagePanel.style.left = `${tableRect.left}px`;
+            markerImagePanel.style.maxWidth = `${tableRect.width}px`;
+        }
+        if (chartRect && chartRect.height > 0) {
+            markerImagePanel.style.maxHeight = `${chartRect.height}px`;
+        }
+    }
+
+    window.addEventListener('resize', () => {
+        if (markerImagePanel.classList.contains('open')) positionMarkerImagePanel();
+    });
 
     function closeMarkerImage() {
         markerImagePanel.classList.remove('open');
@@ -204,7 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return cols.includes('sessionid') && cols.includes('owner') && !cols.includes('timestamp');
     }
 
-    function loadOwnerRows(rows) {
+    function loadOwnerRows(rows, silent = false) {
         const map = new Map();
         let conflicts = 0;
         rows.forEach(row => {
@@ -217,7 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
             map.set(sid, owner); // one owner per session: last row wins
         });
         if (map.size === 0) {
-            alert('No sessionid/owner rows found in the owner list.');
+            if (!silent) alert('No sessionid/owner rows found in the owner list.');
             return;
         }
         ownerMap = map;
@@ -307,26 +335,42 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function handleFile(file) {
+    // Columns the raw survey export must have for the dashboard to work
+    const RAW_REQUIRED_COLUMNS = ['timestamp', 'sessionId', 'rotate', 'depth', 'decision'];
+
+    function isRawCsv(fields) {
+        const cols = new Set((fields || []).map(f => f.trim()));
+        return RAW_REQUIRED_COLUMNS.every(c => cols.has(c));
+    }
+
+    // silent: used for window drops — any file that isn't a usable raw export
+    // or owner list is ignored without touching the current view.
+    function handleFile(file, silent = false) {
         if (!file) return;
+        if (silent && !/\.csv$/i.test(file.name)) return;
+
+        const fail = (msg) => { if (!silent) alert(msg); };
 
         Papa.parse(file, {
             header: true,
             skipEmptyLines: true,
             complete: function(results) {
+                const fields = results.meta.fields;
                 // An owner list dropped here is routed to the owner loader
-                if (isOwnerCsv(results.meta.fields)) loadOwnerRows(results.data);
-                else processData(results.data);
+                if (isOwnerCsv(fields)) loadOwnerRows(results.data, silent);
+                else if (isRawCsv(fields)) processData(results.data, silent);
+                else fail(`CSV is missing required columns: ${RAW_REQUIRED_COLUMNS.join(', ')}.`);
             },
             error: function(err) {
                 console.error('Error parsing CSV:', err);
-                alert('An error occurred while parsing the CSV file.');
+                fail('An error occurred while parsing the CSV file.');
             }
         });
     }
 
     fileInput.addEventListener('change', (e) => {
         handleFile(e.target.files[0]);
+        e.target.value = ''; // allow choosing the same file again
     });
 
     // Drag and Drop Logic
@@ -347,7 +391,7 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         dropZone.classList.remove('dragover');
         if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-            handleFile(e.dataTransfer.files[0]);
+            handleFile(e.dataTransfer.files[0], true);
         }
     });
 
@@ -359,12 +403,23 @@ document.addEventListener('DOMContentLoaded', () => {
         return new Date(normalized);
     }
 
-    function processData(data) {
+    function processData(data, silent = false) {
         // 1. Filter: Delete all rows before April 1st 2026
-        globalFilteredData = data.filter(row => {
+        const datedRows = data.filter(row => {
             const rowDate = parseTimestamp(row.timestamp);
             return rowDate && rowDate >= CUTOFF_DATE;
         });
+
+        // A dropped file with no session passing the hardcoded rules is ignored,
+        // so a stray file can't wipe the current view.
+        if (silent) {
+            const counts = new Map();
+            datedRows.forEach(row => {
+                if (row.sessionId) counts.set(row.sessionId, (counts.get(row.sessionId) || 0) + 1);
+            });
+            if (![...counts.values()].some(c => c >= 50)) return;
+        }
+        globalFilteredData = datedRows;
 
         // 2. Aggregate by sessionId
         const sessionMap = new Map();
