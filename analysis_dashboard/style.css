@@ -57,9 +57,7 @@ body {
     font-size: 1.5rem;
     font-weight: 700;
     letter-spacing: -0.5px;
-    background: linear-gradient(to right, #a78bfa, #38bdf8);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: #a78bfa;
 }
 
 .logo svg {
@@ -155,6 +153,111 @@ input[type="file"] {
     font-size: 2rem;
     font-weight: 700;
     color: var(--text-primary);
+}
+
+.filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1.5rem;
+    background: var(--card-bg);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--card-border);
+    border-radius: 1rem;
+    padding: 0.75rem 1rem;
+    margin-top: -1rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.filter-control {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.filter-control input[type="range"] {
+    width: 140px;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
+.filter-value {
+    color: var(--text-primary);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    min-width: 5.5rem;
+}
+
+.filter-summary {
+    margin-left: auto;
+    font-variant-numeric: tabular-nums;
+}
+
+.owner-controls {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.owner-btn {
+    background: transparent;
+    color: var(--text-primary);
+    border: 1px solid var(--card-border);
+    border-radius: 0.5rem;
+    padding: 0.3rem 0.7rem;
+    font: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.owner-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.owner-filter {
+    flex-basis: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--card-border);
+}
+
+.owner-filter-label {
+    font-weight: 500;
+}
+
+.owner-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.owner-chip {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.6rem;
+    border: 1px solid var(--card-border);
+    border-radius: 999px;
+    color: var(--text-primary);
+    cursor: pointer;
+    font-variant-numeric: tabular-nums;
+}
+
+.owner-chip input[type="checkbox"] {
+    accent-color: var(--accent);
+}
+
+.owner-status {
+    margin-left: auto;
+    font-size: 0.8rem;
+}
+
+.owner-status.warn {
+    color: #fbbf24;
 }
 
 .table-container {

@@ -50,9 +50,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const CUTOFF_DATE = new Date('2026-04-01T00:00:00Z');
     const dropZone = emptyState;
 
+    // Interactive session filters (applied on top of the hardcoded rules above)
+    const DEFAULT_FILTER_DATE = '2026-05-15';
+    const DEFAULT_FILTER_COUNT = 100;
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const dateFilterSlider = document.getElementById('dateFilterSlider');
+    const dateFilterValue = document.getElementById('dateFilterValue');
+    const countFilterSlider = document.getElementById('countFilterSlider');
+    const countFilterValue = document.getElementById('countFilterValue');
+    const filterSummary = document.getElementById('filterSummary');
+    let filterBaseDay = 0; // UTC ms of the date slider's value 0
+
     // State Management
     let globalFilteredData = [];
     let globalValidSessions = [];
+    let uncheckedSessions = new Set(); // survives filter changes
     let scatterChart = null;
     let stdEllipses = null; // { center: {x, y}, rings: [{ label, points }], color } or null when hidden
 
@@ -61,9 +73,181 @@ document.addEventListener('DOMContentLoaded', () => {
             const isChecked = e.target.checked;
             document.querySelectorAll('.session-checkbox').forEach(cb => {
                 cb.checked = isChecked;
+                if (isChecked) uncheckedSessions.delete(cb.dataset.session);
+                else uncheckedSessions.add(cb.dataset.session);
             });
             renderScatterPlot();
         });
+    }
+
+    if (dateFilterSlider) dateFilterSlider.addEventListener('input', () => applyFilters());
+    if (countFilterSlider) countFilterSlider.addEventListener('input', () => applyFilters());
+
+    function dayFromDateStr(dateStr) {
+        return Date.parse(dateStr + 'T00:00:00Z');
+    }
+
+    function clamp(v, lo, hi) {
+        return Math.max(lo, Math.min(hi, v));
+    }
+
+    // Fit both sliders to the loaded sessions and put them at their defaults
+    function setupFilterSliders(sessions) {
+        if (sessions.length === 0) return;
+        const days = sessions.map(s => dayFromDateStr(s.date));
+        const minDay = Math.min(...days);
+        const maxDay = Math.max(...days);
+        filterBaseDay = minDay;
+        const maxIdx = Math.round((maxDay - minDay) / DAY_MS);
+        dateFilterSlider.max = maxIdx;
+        dateFilterSlider.value = clamp(
+            Math.round((dayFromDateStr(DEFAULT_FILTER_DATE) - minDay) / DAY_MS), 0, maxIdx);
+
+        const counts = sessions.map(s => s.count);
+        const minCount = Math.min(...counts);
+        const maxCount = Math.max(...counts);
+        countFilterSlider.min = minCount;
+        countFilterSlider.max = maxCount;
+        countFilterSlider.value = clamp(DEFAULT_FILTER_COUNT, minCount, maxCount);
+    }
+
+    function applyFilters() {
+        const fromDate = new Date(filterBaseDay + Number(dateFilterSlider.value) * DAY_MS)
+            .toISOString().split('T')[0];
+        const minCount = Number(countFilterSlider.value);
+        dateFilterValue.textContent = fromDate;
+        countFilterValue.textContent = `≥ ${minCount}`;
+
+        const visible = globalValidSessions.filter(s =>
+            s.date >= fromDate && s.count >= minCount && passesOwnerFilter(s.sessionId));
+        filterSummary.textContent = `${visible.length} of ${globalValidSessions.length} sessions`;
+        renderDashboard(visible);
+    }
+
+    // ---- Owner list (optional, kept only in this browser) ----
+    // CSV with columns sessionid,owner — loaded separately from the raw data.
+    const OWNER_STORAGE_KEY = 'snm-owner-map';
+    const NO_OWNER = '__none__';
+    const clearOwnersBtn = document.getElementById('clearOwnersBtn');
+    const ownerFilter = document.getElementById('ownerFilter');
+    const ownerChips = document.getElementById('ownerChips');
+    const ownerStatus = document.getElementById('ownerStatus');
+    const ownerColHeader = document.getElementById('ownerColHeader');
+
+    let ownerMap = loadStoredOwners(); // Map<lowercase sessionId, owner> or null
+    let ownerConflicts = 0;
+    let excludedOwners = new Set();    // owner keys (or NO_OWNER) unticked in the filter
+    let dataLoaded = false;
+
+    function loadStoredOwners() {
+        try {
+            const raw = localStorage.getItem(OWNER_STORAGE_KEY);
+            if (!raw) return null;
+            const entries = JSON.parse(raw);
+            return Array.isArray(entries) && entries.length ? new Map(entries) : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function storeOwners() {
+        try {
+            if (ownerMap) localStorage.setItem(OWNER_STORAGE_KEY, JSON.stringify([...ownerMap]));
+            else localStorage.removeItem(OWNER_STORAGE_KEY);
+        } catch (e) { /* storage unavailable: owners last for this page only */ }
+    }
+
+    function ownerOf(sessionId) {
+        return ownerMap && sessionId ? ownerMap.get(sessionId.trim().toLowerCase()) || null : null;
+    }
+
+    function passesOwnerFilter(sessionId) {
+        if (!ownerMap) return true;
+        return !excludedOwners.has(ownerOf(sessionId) || NO_OWNER);
+    }
+
+    function isOwnerCsv(fields) {
+        const cols = (fields || []).map(f => f.trim().toLowerCase());
+        return cols.includes('sessionid') && cols.includes('owner') && !cols.includes('timestamp');
+    }
+
+    function loadOwnerRows(rows) {
+        const map = new Map();
+        let conflicts = 0;
+        rows.forEach(row => {
+            const norm = {};
+            Object.keys(row).forEach(k => { norm[k.trim().toLowerCase()] = row[k]; });
+            const sid = (norm.sessionid || '').trim().toLowerCase();
+            const owner = (norm.owner || '').trim().toUpperCase();
+            if (!sid || !owner) return;
+            if (map.has(sid) && map.get(sid) !== owner) conflicts++;
+            map.set(sid, owner); // one owner per session: last row wins
+        });
+        if (map.size === 0) {
+            alert('No sessionid/owner rows found in the owner list.');
+            return;
+        }
+        ownerMap = map;
+        ownerConflicts = conflicts;
+        excludedOwners = new Set();
+        storeOwners();
+        refreshOwnerUI();
+        if (dataLoaded) applyFilters();
+    }
+
+    function clearOwners() {
+        ownerMap = null;
+        ownerConflicts = 0;
+        excludedOwners = new Set();
+        storeOwners();
+        refreshOwnerUI();
+        if (dataLoaded) applyFilters();
+    }
+
+    if (clearOwnersBtn) clearOwnersBtn.addEventListener('click', clearOwners);
+
+    function refreshOwnerUI() {
+        const hasOwners = !!ownerMap;
+        clearOwnersBtn.style.display = hasOwners ? '' : 'none';
+        ownerFilter.style.display = hasOwners ? 'flex' : 'none';
+        ownerColHeader.style.display = hasOwners ? '' : 'none';
+        ownerChips.innerHTML = '';
+        if (!hasOwners) return;
+
+        // Session counts per owner among the loaded sessions
+        const counts = new Map();
+        const loadedIds = new Set();
+        globalValidSessions.forEach(s => {
+            loadedIds.add(s.sessionId.trim().toLowerCase());
+            const key = ownerOf(s.sessionId) || NO_OWNER;
+            counts.set(key, (counts.get(key) || 0) + 1);
+        });
+
+        const owners = [...new Set(ownerMap.values())].sort();
+        owners.concat(NO_OWNER).forEach(key => {
+            const label = document.createElement('label');
+            label.className = 'owner-chip';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.checked = !excludedOwners.has(key);
+            cb.addEventListener('change', () => {
+                if (cb.checked) excludedOwners.delete(key);
+                else excludedOwners.add(key);
+                if (dataLoaded) applyFilters();
+            });
+            const text = key === NO_OWNER ? 'No owner' : key;
+            label.append(cb, dataLoaded ? `${text} (${counts.get(key) || 0})` : text);
+            ownerChips.appendChild(label);
+        });
+
+        const notes = [`${ownerMap.size} sessions in owner list`];
+        if (dataLoaded) {
+            const unmatched = [...ownerMap.keys()].filter(id => !loadedIds.has(id)).length;
+            if (unmatched) notes.push(`${unmatched} not among loaded sessions`);
+        }
+        if (ownerConflicts) notes.push(`${ownerConflicts} conflicting rows (last kept)`);
+        ownerStatus.textContent = notes.join(' · ');
+        ownerStatus.classList.toggle('warn', notes.length > 1);
     }
 
     if (heatmapToggle) {
@@ -97,7 +281,9 @@ document.addEventListener('DOMContentLoaded', () => {
             header: true,
             skipEmptyLines: true,
             complete: function(results) {
-                processData(results.data);
+                // An owner list dropped here is routed to the owner loader
+                if (isOwnerCsv(results.meta.fields)) loadOwnerRows(results.data);
+                else processData(results.data);
             },
             error: function(err) {
                 console.error('Error parsing CSV:', err);
@@ -121,7 +307,10 @@ document.addEventListener('DOMContentLoaded', () => {
         dropZone.classList.remove('dragover');
     });
 
-    dropZone.addEventListener('drop', (e) => {
+    // Files can be dropped anywhere in the window: an owner list (sessionid,owner)
+    // is detected and loaded as owners, anything else as raw data.
+    document.addEventListener('dragover', (e) => e.preventDefault());
+    document.addEventListener('drop', (e) => {
         e.preventDefault();
         dropZone.classList.remove('dragover');
         if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
@@ -225,8 +414,12 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
-        // 6. Render UI
-        renderDashboard(globalValidSessions);
+        // 6. Render UI through the interactive filters
+        uncheckedSessions = new Set();
+        dataLoaded = true;
+        setupFilterSliders(globalValidSessions);
+        refreshOwnerUI();
+        applyFilters();
     }
 
     function renderDashboard(sessions) {
@@ -240,14 +433,16 @@ document.addEventListener('DOMContentLoaded', () => {
         resultsBody.innerHTML = '';
 
         // Sort sessions by date (ascending), then by count (descending)
-        sessions.sort((a, b) => {
+        sessions = sessions.slice().sort((a, b) => {
             const dateDiff = a.date.localeCompare(b.date);
             if (dateDiff !== 0) return dateDiff;
             return b.count - a.count;
         });
 
-        // Reset select all checkbox
-        if (selectAllCheckbox) selectAllCheckbox.checked = true;
+        // Select-all reflects whether every visible session is checked
+        if (selectAllCheckbox) {
+            selectAllCheckbox.checked = sessions.every(s => !uncheckedSessions.has(s.sessionId));
+        }
 
         // Render rows
         sessions.forEach(session => {
@@ -258,11 +453,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const cb = document.createElement('input');
             cb.type = 'checkbox';
             cb.className = 'session-checkbox';
-            cb.checked = true;
+            cb.checked = !uncheckedSessions.has(session.sessionId);
             cb.dataset.session = session.sessionId;
             cb.addEventListener('change', () => {
-                if (!cb.checked && selectAllCheckbox) {
-                    selectAllCheckbox.checked = false;
+                if (cb.checked) uncheckedSessions.delete(session.sessionId);
+                else uncheckedSessions.add(session.sessionId);
+                if (selectAllCheckbox) {
+                    selectAllCheckbox.checked = Array.from(document.querySelectorAll('.session-checkbox'))
+                        .every(box => box.checked);
                 }
                 renderScatterPlot();
             });
@@ -290,11 +488,17 @@ document.addEventListener('DOMContentLoaded', () => {
             tr.appendChild(tdCount);
             tr.appendChild(tdAvgTime);
 
+            if (ownerMap) {
+                const tdOwner = document.createElement('td');
+                tdOwner.textContent = ownerOf(session.sessionId) || '—';
+                tr.appendChild(tdOwner);
+            }
+
             resultsBody.appendChild(tr);
         });
 
         if (sessions.length === 0) {
-            resultsBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-secondary);">No sessions found meeting the criteria.</td></tr>';
+            resultsBody.innerHTML = '<tr><td colspan="${ownerMap ? 6 : 5}" style="text-align: center; color: var(--text-secondary);">No sessions found meeting the criteria.</td></tr>';
         }
 
         renderScatterPlot();
@@ -339,6 +543,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 y: depth,
                 filename: row.filename,
                 sessionShort: row.sessionId ? row.sessionId.substring(0, 4) : 'N/A',
+                owner: ownerOf(row.sessionId),
                 decisionTimeSec
             };
 
@@ -470,7 +675,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                 label: function(context) {
                                     const pt = context.raw;
                                     const fname = pt.filename || 'Unknown File';
-                                    const base = `ID: ${pt.sessionShort} | ${fname}`;
+                                    const id = pt.owner ? `${pt.sessionShort} (${pt.owner})` : pt.sessionShort;
+                                    const base = `ID: ${id} | ${fname}`;
                                     return pt.decisionTimeSec != null ? `${base} | ${pt.decisionTimeSec.toFixed(2)}s` : base;
                                 }
                             }

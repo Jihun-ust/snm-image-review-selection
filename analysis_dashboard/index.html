@@ -39,6 +39,28 @@
                         </div>
                     </div>
 
+                    <div class="filter-bar" id="filterBar">
+                        <div class="filter-control">
+                            <label for="dateFilterSlider">From date</label>
+                            <input type="range" id="dateFilterSlider" min="0" max="0" step="1" value="0">
+                            <span class="filter-value" id="dateFilterValue">—</span>
+                        </div>
+                        <div class="filter-control">
+                            <label for="countFilterSlider">Min records</label>
+                            <input type="range" id="countFilterSlider" min="50" max="50" step="1" value="50">
+                            <span class="filter-value" id="countFilterValue">—</span>
+                        </div>
+                        <span class="filter-summary" id="filterSummary"></span>
+                        <div class="owner-controls">
+                            <button type="button" id="clearOwnersBtn" class="owner-btn" style="display: none;">Clear owners</button>
+                        </div>
+                        <div class="owner-filter" id="ownerFilter" style="display: none;">
+                            <span class="owner-filter-label">Owners</span>
+                            <div class="owner-chips" id="ownerChips"></div>
+                            <span class="owner-status" id="ownerStatus"></span>
+                        </div>
+                    </div>
+
                     <div class="table-container" id="tableContainer">
                         <table id="resultsTable">
                             <thead>
@@ -50,6 +72,7 @@
                                     <th>Session ID</th>
                                     <th>Total Records</th>
                                     <th>Avg Decision Time (sec)</th>
+                                    <th id="ownerColHeader" style="display: none;">Owner</th>
                                 </tr>
                             </thead>
                             <tbody id="resultsBody">
