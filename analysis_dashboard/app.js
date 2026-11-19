@@ -38,6 +38,39 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Marker image panel: clicking a chart marker shows its image over the left half
+    const IMAGE_DIR = '../images/';
+    const markerImagePanel = document.getElementById('markerImagePanel');
+    const markerImage = document.getElementById('markerImage');
+    const markerImageTitle = document.getElementById('markerImageTitle');
+    const markerImageError = document.getElementById('markerImageError');
+    const closeMarkerImageBtn = document.getElementById('closeMarkerImageBtn');
+
+    function openMarkerImage(pt) {
+        if (!pt || !pt.filename) return;
+        markerImageTitle.textContent = `Angle ${pt.x} · Depth ${pt.y}`;
+        markerImageError.hidden = true;
+        markerImage.hidden = false;
+        markerImage.alt = pt.filename;
+        markerImage.src = IMAGE_DIR + encodeURIComponent(pt.filename);
+        markerImagePanel.classList.add('open');
+        markerImagePanel.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeMarkerImage() {
+        markerImagePanel.classList.remove('open');
+        markerImagePanel.setAttribute('aria-hidden', 'true');
+    }
+
+    markerImage.addEventListener('error', () => {
+        markerImage.hidden = true;
+        markerImageError.hidden = false;
+    });
+    closeMarkerImageBtn.addEventListener('click', closeMarkerImage);
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && markerImagePanel.classList.contains('open')) closeMarkerImage();
+    });
+
     if (imageOverlay) {
         imageOverlay.addEventListener('click', (e) => {
             if (e.target === imageOverlay) {
@@ -651,6 +684,14 @@ document.addEventListener('DOMContentLoaded', () => {
                             grid: { color: 'rgba(255, 255, 255, 0.1)' },
                             ticks: { color: '#94a3b8' }
                         }
+                    },
+                    onClick: (evt, elements, chart) => {
+                        if (!elements.length) return;
+                        const { datasetIndex, index } = elements[0];
+                        openMarkerImage(chart.data.datasets[datasetIndex].data[index]);
+                    },
+                    onHover: (evt, elements, chart) => {
+                        chart.canvas.style.cursor = elements.length ? 'pointer' : 'default';
                     },
                     plugins: {
                         legend: {
